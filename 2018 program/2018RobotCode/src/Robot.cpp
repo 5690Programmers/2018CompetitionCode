@@ -68,6 +68,8 @@ public:
 	Robot()
 	{
 
+		//Testing
+
 		//Note SmartDashboard is not initialized here, wait until RobotInit to make SmartDashboard calls
 		myRobot.SetExpiration(0.1);
 
