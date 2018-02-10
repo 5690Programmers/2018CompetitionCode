@@ -29,7 +29,7 @@ class Robot: public frc::SampleRobot {
 	frc::Spark Right2 {2};
 	frc::Spark Left1 {3};
 	frc::Spark Left2 {4};
-//the values of these need to be changed when it is actually wired
+//change values when wired
 	frc::VictorSP IntakeL{5}; //see Intake controller group
 	frc::VictorSP IntakeR{6}; //see Intake controller group
 	frc::VictorSP Elevator{7}; //right and left triggers
