@@ -22,6 +22,7 @@
 #include <WPILib.h>
 
 #include "networktables/NetworkTableInstance.h"
+using std::string;
 
 class Robot: public frc::SampleRobot {
 
@@ -35,6 +36,9 @@ class Robot: public frc::SampleRobot {
 	frc::VictorSP Elevator{7}; //right and left triggers
 	frc::VictorSP Folder{8};  //start and select
 	frc::VictorSP Climber{0}; //right bumper
+
+	frc::DigitalInput FolderF {4};
+	frc::DigitalInput FolderB {5};
 
 	frc::SpeedControllerGroup Intake{IntakeL, IntakeR}; //A, B, C, D buttons
 	//driving speed controllers
@@ -61,15 +65,21 @@ class Robot: public frc::SampleRobot {
 
 
 public:
+
+	std::shared_ptr<NetworkTable> Table;//week zero network table
+
 	//Gets the ultrasonic sensor's value
 	int Ultrasensor();
 
 
 	Robot()
 	{
+	//	Table = NetworkTable::GetTable("DataTable");//week zero network table
 
-		//Testing
-
+		nt::NetworkTableInstance offSeasonNetworkTable;
+		offSeasonNetworkTable = nt::NetworkTableInstance::Create();
+		offSeasonNetworkTable.StartClient("10.0.100.5");
+		string gameData = offSeasonNetworkTable.GetEntry("GameData").GetString("defaultValue");
 		//Note SmartDashboard is not initialized here, wait until RobotInit to make SmartDashboard calls
 		myRobot.SetExpiration(0.1);
 
@@ -91,18 +101,15 @@ public:
 	}
 
 	void RobotInit() {
-		 {
+
 
 		        try {
-		            //ahrs = new AHRS(SPI::Port::kMXP);
-		            //ahrs = new AHRS(I2C::Port::kMXP);
 		            ahrs->EnableLogging(true);
 		        } catch (std::exception& ex ) {
-		            std::string err_string = "Error instantiating navX MXP:  ";
+		            std::string err_string = "Error enabling object navX MXP:  ";
 		            err_string += ex.what();
 		            DriverStation::ReportError(err_string.c_str());
 		        }
-			}
 
 		chooser.AddDefault(autoNameMiddle, autoNameMiddle);
 		chooser.AddObject(autoNameLeft, autoNameLeft);
@@ -162,7 +169,7 @@ public:
 	}
 
 	void OperatorControl() override {
-	 {
+	{
 
 		myRobot.SetSafetyEnabled(true);
 		double deadzone = 0.2;
@@ -215,37 +222,46 @@ public:
 			 else
 				myRobot.ArcadeDrive( XboxY, XboxX/1.25, true);
 	        //elevator
-	        if (Xbox.GetTriggerAxis(XboxController::JoystickHand(1)) > 0){ //Limit switch stuff eventually
-	        	Elevator.Set(Xbox.GetTriggerAxis(XboxController::JoystickHand(1)));
-	        }else if (Xbox.GetTriggerAxis(XboxController::JoystickHand(0)) > 0){ //Limit switch stuff eventually
+	        if (Xbox.GetTriggerAxis(XboxController::JoystickHand(0)) > 0){ //Limit switch stuff eventually
 	        	Elevator.Set(-Xbox.GetTriggerAxis(XboxController::JoystickHand(0)));
-	        }else{
+	        }
+	        else if (Xbox.GetTriggerAxis(XboxController::JoystickHand(1)) > 0){ //Limit switch stuff eventually
+	        	Elevator.Set(Xbox.GetTriggerAxis(XboxController::JoystickHand(1)));
+	        }
+	        else{
 	        	Elevator.Set(0);
 	        }
 	        //climber
 	        if (Xbox.GetBumper(XboxController::JoystickHand(0))){
 	        	Climber.Set(0.75);
-	        }else {
+	        }
+	        else {
 	        	Climber.Set(0);
 	        }
 	        //folder
-	        if (Xbox.GetStartButton()){ //Limit switch stuff eventually
-	        	Folder.Set(0.25);
-	        }else if (Xbox.GetBackButton()){ //Limit switch stuff eventually
-	        	Folder.Set(0.25);
-	        }else{
+	        if (Xbox.GetStartButton() && FolderB.Get()){ //Limit switch stuff eventually
+	        	Folder.Set(-0.25); //Lean Back
+	        }
+	        else if (Xbox.GetBackButton() && FolderF.Get()){ //Limit switch stuff eventually
+	        	Folder.Set(0.25); //Lean Forward
+	        }
+	        else{
 	        	Folder.Set(0);
 	        }
 	        //intake
 	        if (Xbox.GetAButton()){
 	        	Intake.Set(0.25);
-	        }else if (Xbox.GetBButton()){
+	        }
+	        else if (Xbox.GetBButton()){
 	        	Intake.Set(0.5);
-	        }else if (Xbox.GetXButton()){
+	        }
+	        else if (Xbox.GetXButton()){
 	        	Intake.Set(-0.25);
-	        }else if (Xbox.GetYButton()){
+	        }
+	        else if (Xbox.GetYButton()){
 	        	Intake.Set(-0.5);
-	        }else{
+	        }
+	        else{
 	        	Intake.Set(0);
 	        }
 
@@ -253,10 +269,18 @@ public:
 			//Correction = (-EncoderL.GetDistance()*0.0104) - (EncoderR.GetDistance()*0.0104);
 			frc::Wait(0.005);
 		}
-		}
 	}
-
-	void Test(){}
+//week zero network table sending one?
+			double x = 0;
+			double y = 0;
+			while(IsOperatorControl() && IsEnabled());
+			Wait(1.0);
+			Table->PutNumber("X",x);
+			Table->PutNumber("Y",y);
+			x+= 0.25;
+			y+= 0.25;
+}
+			void Test(){}
 
 	//Reads the input from the ultrasonic rangefinder and converts it to inches.
 	//Pre: Working Ultrasonic sensor
