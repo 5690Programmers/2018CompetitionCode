@@ -1,9 +1,12 @@
 // Pick a Robot, or your motors will be sad!!!
-#define NEW_BOT_
+#define FRIDAY_
 //#define NIGEL_
-#define ROBOT_SPEED 0.5
-#define CALIBRATE_STRAIGHT 0.5183
+#define ROBOT_SPEED 0.65
+#define CALIBRATE_STRAIGHT 0.65183
+#define ENCODER_STEP 0.0099
 #define NavX true
+
+#define Plan_B true
 
 #include <iostream>
 #include <memory>
@@ -32,7 +35,7 @@
 using std::string;
 
 class Robot: public frc::SampleRobot {
-#ifdef NEW_BOT_
+#ifdef FRIDAY_
 	frc::Spark Right1 {1};
 	frc::Spark Right2 {2};
 	frc::Spark Left1 {3};
@@ -90,25 +93,20 @@ public:
 
 	Robot()
 	{
-	//	Table = NetworkTable::GetTable("DataTable");//week zero network table
-
-		nt::NetworkTableInstance offSeasonNetworkTable;
-		offSeasonNetworkTable = nt::NetworkTableInstance::Create();
-		offSeasonNetworkTable.StartClient("10.0.100.5"); //
-		string gameData = offSeasonNetworkTable.GetEntry("GameData").GetString("defaultValue");
+		//Table = NetworkTable::GetTable("DataTable"); //UNNOTE WHEN NEEDED THIS IS NEEDED FOR COMPETITION
 		//Note SmartDashboard is not initialized here, wait until RobotInit to make SmartDashboard calls
 		myRobot.SetExpiration(0.1);
 
 
 		EncoderL.SetMaxPeriod(0.1);
 		EncoderL.SetMinRate(10);
-		EncoderL.SetDistancePerPulse(0.0099); //may be .01
-		EncoderL.SetReverseDirection(true); // based on going 8 inches too far last time.  --Alec
+		EncoderL.SetDistancePerPulse(ENCODER_STEP); //may be .01
+		EncoderL.SetReverseDirection(true);
 		EncoderL.SetSamplesToAverage(7);
 
 		EncoderR.SetMaxPeriod(0.1);
 		EncoderR.SetMinRate(10);
-		EncoderR.SetDistancePerPulse(0.0099);//may be .01
+		EncoderR.SetDistancePerPulse(ENCODER_STEP);//may be .01
 		EncoderR.SetReverseDirection(false);
 		EncoderR.SetSamplesToAverage(7);
 
@@ -147,16 +145,16 @@ public:
 		}
 		else if(autoSelected == autoNameLeft){
 			//[]is start of start of scale and '' is start of switch
-			if(gameData[0]=='L'){
-				if(gameData[1]== 'L'){
+			if(gameData[0] =='L'){
+				if(gameData[1] == 'L'){
 					StartLeftSwitchLeftScaleLeft();
 				}
 				else{
 					StartLeftSwitchLeftScaleRight();
 				}
 			}
-			else if(gameData[0]=='R'){
-				if(gameData[1]== 'L'){
+			else if(gameData[0] =='R'){
+				if(gameData[1] == 'L'){
 					StartLeftSwitchRightScaleLeft();
 				}
 				else{
@@ -166,16 +164,16 @@ public:
 		} //next section right side
 
 		else if(autoSelected == autoNameRight){
-			if(gameData[0]=='L'){
-				if(gameData[1]== 'L'){
+			if(gameData[0] =='L'){
+				if(gameData[1] == 'L'){
 					StartRightSwitchLeftScaleLeft();
 				}
 				else{
 					StartRightSwitchLeftScaleRight();
 				}
 			}
-			else if(gameData[0]=='R'){
-				if(gameData[1]== 'L'){
+			else if(gameData[0] =='R'){
+				if(gameData[1] == 'L'){
 					StartRightSwitchRightScaleLeft();
 				}
 				else{
@@ -237,10 +235,10 @@ public:
 			myRobot.ArcadeDrive( XboxY, XboxX/1.25, true);
 	        //elevator
 	        if (Xbox.GetY(XboxController::JoystickHand(1)) > 0){ //Limit switch change values when wired
-	        	if (ElevatorU.Get()) Elevator.Set(Xbox.GetY(XboxController::JoystickHand(1)));
+	        	if (ElevatorU.Get()) Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
 	        }
 	        else if (Xbox.GetY(XboxController::JoystickHand(1)) < 0){ //Limit switch change values when wired
-	        	if (ElevatorD.Get())Elevator.Set(Xbox.GetY(XboxController::JoystickHand(1)));
+	        	if (ElevatorD.Get())Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
 	        }
 	        else{
 	        	Elevator.Set(0);
@@ -262,11 +260,14 @@ public:
 	        else{
 	        	Folder.Set(0);
 	        }
-	        //output
+	        //intake
 
-	        if(Xbox.GetTriggerAxis(XboxController::JoystickHand(1)) > 0)
+	        frc::SmartDashboard::PutNumber("Triggered 0", Xbox.GetTriggerAxis(XboxController::JoystickHand(0)));
+	        frc::SmartDashboard::PutNumber("Triggered 1", Xbox.GetTriggerAxis(XboxController::JoystickHand(1)));
+
+	        if(Xbox.GetTriggerAxis(XboxController::JoystickHand(1)) > 0.2)
 	        	Intake.Set(Xbox.GetTriggerAxis(XboxController::JoystickHand(1)));
-	        else if(Xbox.GetTriggerAxis(XboxController::JoystickHand(0)) > 0)
+	        else if(Xbox.GetTriggerAxis(XboxController::JoystickHand(0)) > 0.2)
 	        	Intake.Set(-Xbox.GetTriggerAxis(XboxController::JoystickHand(0)));
 	        else{
 	        	Intake.Set(0);
@@ -277,15 +278,6 @@ public:
 			frc::Wait(0.005);
 		}
 	}
-//week zero network table sending one?
-			double x = 0;
-			double y = 0;
-			while(IsOperatorControl() && IsEnabled());
-			Wait(1.0);
-			Table->PutNumber("X",x);
-			Table->PutNumber("Y",y);
-			x+= 0.25;
-			y+= 0.25;
 }
 			void Test(){}
 
@@ -296,14 +288,14 @@ public:
 	int UltraSensor (){
 		return (DisStuff.GetVoltage()*40.297);
 	}
-	//Drives to distance EARLIUUGHAERVILHNAERJOINAERGOJNVERAPOINJWA$RGHJNIKJREAGIPHNKERAG{OJERAGOPJERAHOJ
+	//Drives to distance
 	//Pre: a valid distance
 	//Post: drives forward the distance
 	//Returns nothing
 	void goForward(double distance) {
 		bool drive(true);
 		int error(0);
-		EncoderL.Reset();;
+		EncoderL.Reset();
 		EncoderR.Reset();
 		const double target(ahrs->GetAngle());
 		/* just go forward dammit
@@ -313,12 +305,14 @@ public:
 		}*/
 
 		while(drive && IsEnabled()) {
-			if((-EncoderL.GetDistance() < (distance - 2)) && (EncoderR.GetDistance() < (distance - 2))) {
+			frc::SmartDashboard::PutNumber("EncoderL",EncoderL.GetDistance());
+			frc::SmartDashboard::PutNumber("EncoderR",EncoderR.GetDistance());
+			if((-EncoderL.GetDistance() < (distance)) && (EncoderR.GetDistance() < (distance))) {
 				NavXForward(target);
 				frc::Wait(0.05);
 				error = 0;
 			}
-			else if((-EncoderL.GetDistance() > (distance + 2)) && (EncoderR.GetDistance() > (distance + 2))) {
+			else if((-EncoderL.GetDistance() > (distance + 1)) && (EncoderR.GetDistance() > (distance + 1))) {
 				NavXBackwards(target);
 				frc::Wait(0.05);
 				error = 0;
@@ -345,29 +339,20 @@ public:
 	void turnTo(double angle) {
 
 		bool drive(true);
-		int error(0);
 		double target = ahrs->GetAngle() + angle;
 		while(drive && IsEnabled()) {
 			if(((ahrs->GetAngle()) < (target - 1))) {
-				myRobot.TankDrive(0.75,-0.75);
+				myRobot.TankDrive(0.6,-0.6);
 				frc::Wait(0.05);
-				error = 0;
 			}
-			else if(((ahrs->GetAngle()) < (target + 1))) {
-				myRobot.TankDrive(-0.75,0.75);
+			else if(((ahrs->GetAngle()) > (target + 1))) {
+				myRobot.TankDrive(-0.6,0.6);
 				frc::Wait(0.05);
-				error = 0;
 			}
 			else {
-				if(error < 100){
-					myRobot.TankDrive(0, 0);
-					error++;
-					frc::Wait(0.005);
-				}
-				else {
 					myRobot.TankDrive(0, 0);
 					drive = false;
-				}
+
 			}
 			myRobot.TankDrive(0,0);
 		}
@@ -391,6 +376,7 @@ public:
 			myRobot.TankDrive(-ROBOT_SPEED, fix);
 		}
 	void FoldUp(){
+			return;
 		 while (FolderF.Get())
 			 Folder.Set(0.25); //Lean Forward
 		 Folder.Set(0.0);
@@ -400,8 +386,8 @@ public:
 	}
 	void ToSwitch(){
 		double time=0;
-				if (ElevatorU.Get()) Elevator.Set(.5);
-				while (ElevatorU.Get() && time<=1.0){
+				if (ElevatorU.Get()) Elevator.Set(.8);
+				while (ElevatorU.Get() && time<=2.5){
 					frc::Wait(.1);
 					time+=0.1;
 				}
@@ -419,26 +405,36 @@ public:
 		OutPut();
 	}
 	void StartIntake(){
-		Intake.Set(0.5);
+		Intake.Set(-0.5);
 		//wait to tinker with
 	}
 
 	void OutPut(){
-		Intake.Set(-0.25);
+		Intake.Set(1.0);
 		frc::Wait(1.0);
 		Intake.Set(0.0);
 	}
 	void StartMiddle(){
-		goForward(10.0);
+		frc::Wait(1.0);
+		turnTo(90);
 	}
-
-	void StartLeftSwitchLeftScaleLeft(){
+//FIELD CROSSING AUTOS NEED TO BE CHECKED THEY'RE ALL MOSTLY GUESSED
+	void StartLeftSwitchLeftScaleLeft(){//CHECK RANDOM GUESS
 		//left side auto (LL)
-		FoldUp();
-		goForward(10.0);//10.0
+		goForward(14.0);//10.0
 		turnTo(90.0);
-		goForward(3.0);
+		goForward(1.0);
 		ToSwitch();
+		goForward(-1);
+		turnTo(-90);
+		goForward(2.0);
+		turnTo(90.0);
+		StartIntake();
+		Wait(8);
+		goForward(4.0);
+		turnTo(30.0);
+		ToSwitch();
+#ifndef Plan_B
 		goForward(-1.0);
 		turnTo(-90.0);
 		goForward(5.0);
@@ -447,16 +443,18 @@ public:
 		goForward(2.0);
 		StopIntake();
 		goForward(-2.0);
+
 		turnTo(-135.0);
 		goForward(6.0);
 		ToScale();
+#endif
 }
 	void StartLeftSwitchLeftScaleRight(){
-		FoldUp();
-		goForward(10.0);
+		goForward(14.0);
 		turnTo(90.0);
-		goForward(3.0);
+		goForward(1.0);
 		ToSwitch();
+#ifndef Plan_B
 		goForward(-1.0);
 		turnTo(-90.0);
 		goForward(5.0);
@@ -470,17 +468,17 @@ public:
 		turnTo(-90.0);
 		goForward(6.0);
 		ToScale();
+#endif
 	}
-	void StartLeftSwitchRightScaleLeft(){
-		FoldUp();
-		goForward(15.5);
+	void StartLeftSwitchRightScaleLeft(){//CHECK THE ROUTES
+		goForward(18.5);//15.5
 		turnTo(90);
-		goForward(20.0);
+		goForward(19.0);//20.0
 		turnTo(90);
-		goForward(5.5);
-		turnTo(90.0);
-		goForward(4.0);
+		goForward(1.5);//5.5
 		ToSwitch();
+		StartIntake();
+#ifndef Plan_B
 		goForward(-1.0);
 		turnTo(90.0);
 		goForward(5.5);
@@ -494,17 +492,19 @@ public:
 		turnTo(-165);
 		goForward(5.0);
 		ToScale();
-}
-	void StartLeftSwitchRightScaleRight(){
-		FoldUp();
-		goForward(15.5);
+#endif
+	}
+	void StartLeftSwitchRightScaleRight(){//CHECK TO ROUTES
+		goForward(18.5);//15.5
 		turnTo(90);
-		goForward(20.0);
+		goForward(19.0);//20.0
 		turnTo(90);
-		goForward(5.5);
-		turnTo(90.0);
-		goForward(4.0);
+		goForward(1.5);//5.5
 		ToSwitch();
+		StartIntake();
+#ifndef Plan_B
+		turnTo(90.0);
+		goForward(5.0);//4.0
 		goForward(-1.0);
 		turnTo(90.0);
 		goForward(5.0);
@@ -516,13 +516,14 @@ public:
 		turnTo(135.0);
 		goForward(6.0);
 		ToScale();
+#endif
 	}
-	void StartRightSwitchLeftScaleLeft(){
-		FoldUp();
-		goForward(10.0);
+	void StartRightSwitchRightScaleLeft(){
+		goForward(14.0);
 		turnTo(-90.0);
-		goForward(3.0);
+		goForward(1.0);
 		ToSwitch();
+#ifndef Plan_B
 		goForward(-1.0);
 		turnTo(90.0);
 		goForward(5.0);
@@ -534,13 +535,14 @@ public:
 		turnTo(135.0);
 		goForward(6.0);
 		ToScale();
+#endif
 	}
-	void StartRightSwitchLeftScaleRight(){
-		FoldUp();
-		goForward(10.0);
+	void StartRightSwitchRightScaleRight(){
+		goForward(14.0);
 		turnTo(-90.0);
-		goForward(3.0);
+		goForward(1.0);
 		ToSwitch();
+#ifndef Plan_B
 		goForward(-1.0);
 		turnTo(90.0);
 		goForward(5.0);
@@ -554,17 +556,19 @@ public:
 		turnTo(90.0);
 		goForward(6.0);
 		ToScale();
+#endif
 	}
-	void StartRightSwitchRightScaleLeft(){
-		FoldUp();
-		goForward(15.5);
+	void StartRightSwitchLeftScaleLeft(){//CHECK THE ROUTES
+		goForward(18.5);//15.5
 		turnTo(-90);
-		goForward(20.0);
+		goForward(19.0);//20.0
 		turnTo(-90);
-		goForward(5.5);
-		turnTo(-90.0);
-		goForward(4.0);
+		goForward(1.5);//5.5
 		ToSwitch();
+		StartIntake();
+#ifndef Plan_B
+		turnTo(-90.0);
+		goForward(5.0);//4.0
 		goForward(-1.0);
 		turnTo(-90.0);
 		goForward(5.5);
@@ -578,12 +582,19 @@ public:
 		turnTo(165);
 		goForward(5.0);
 		ToScale();
+#endif
 	}
-	void StartRightSwitchRightScaleRight(){
-		FoldUp();
-		goForward(10.0);
+	void StartRightSwitchLeftScaleRight(){//CHECK THE ROUTES
+		goForward(18.5);//10
 	    turnTo(-90.0);
-		goForward(4.0);
+		goForward(21.0);//20
+		turnTo(-90);
+		goForward(6.5);//5.5
+		turnTo(-90.0);
+		goForward(5.0);//4.0
+		ToSwitch();
+		goForward(-1.0);
+#ifndef Plan_B
 		ToSwitch();
         goForward(-1.0);
 		turnTo(90.0);
@@ -596,6 +607,7 @@ public:
 		turnTo(135.0);
 		goForward(6.0);
 		ToScale();
+#endif
 		}
 
 };
