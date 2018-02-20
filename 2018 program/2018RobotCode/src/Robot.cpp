@@ -1,8 +1,8 @@
 // Pick a Robot, or your motors will be sad!!!
+//#define FRIDAY_
 #define FRIDAY_
-//#define NIGEL_
 #define ROBOT_SPEED 0.65
-#define CALIBRATE_STRAIGHT 0.65183
+#define CALIBRATE_STRAIGHT 0.64183
 #define ENCODER_STEP 0.0099
 #define NavX true
 
@@ -52,11 +52,8 @@ class Robot: public frc::SampleRobot {
 	frc::VictorSP IntakeL{8}; //see Intake controller group
 	frc::VictorSP IntakeR{7}; //see Intake controller group
 	frc::VictorSP Elevator{6}; //right and left triggers
-	frc::VictorSP Folder{5};  //start and select
 	frc::VictorSP Climber{9}; //right bumper
 
-	frc::DigitalInput FolderF {4};
-	frc::DigitalInput FolderB {5};
 	frc::DigitalInput ElevatorU {7};
 	frc::DigitalInput ElevatorD {6};
 
@@ -77,8 +74,8 @@ class Robot: public frc::SampleRobot {
 	frc::SendableChooser<std::string> chooser;
 
 	const std::string autoNameMiddle = "StartMiddle";
-	const std::string autoNameRight = "StartLeft";
-	const std::string autoNameLeft = "StartRight";
+	const std::string autoNameLeft = "StartLeft";
+	const std::string autoNameRight = "StartRight";
 
 	AHRS *ahrs;
 
@@ -196,8 +193,8 @@ public:
 
 		while (IsOperatorControl() && IsEnabled()) {
 
-			SmartDashboard::PutNumber( "Left DisNotRaw: ", (EncoderL.GetDistance()*0.0104));//Left Motor Distance in inches  //*0.0104
-			SmartDashboard::PutNumber( "Right DisNotRaw: ", (EncoderR.GetDistance()*0.0104));//Right Motor Distance in inches  //*0.0104
+			SmartDashboard::PutNumber( "Left DisNotRaw: ", (EncoderL.GetDistance()));//Left Motor Distance in inches  //*0.0104
+			SmartDashboard::PutNumber( "Right DisNotRaw: ", (EncoderR.GetDistance()));//Right Motor Distance in inches  //*0.0104
 			SmartDashboard::PutBoolean( "IMU_Connected",        ahrs->IsConnected());//Is the NavX connected
 		    SmartDashboard::PutNumber(  "IMU_Yaw",              ahrs->GetYaw());//What angle the robot is at
 			SmartDashboard::PutNumber(  "IMU_TotalYaw",         ahrs->GetAngle());//What angle the robot is at for real
@@ -206,6 +203,9 @@ public:
 			SmartDashboard::PutNumber(  "Velocity_Y",           ahrs->GetVelocityY() );//How fast robot is in Y direction
 	        SmartDashboard::PutNumber(  "Displacement_X",       ahrs->GetDisplacementX() );//How far robot is in X direction
 			SmartDashboard::PutNumber(  "Displacement_Y",       ahrs->GetDisplacementY() );//How far robot is in Y direction
+
+
+
 
 //Tank with adjustments
 			if(Xbox.GetX(XboxController::JoystickHand(0)) > deadzone || Xbox.GetX(XboxController::JoystickHand(0)) < -deadzone){
@@ -217,7 +217,6 @@ public:
 
 			if(-Xbox.GetY(XboxController::JoystickHand(0)) > deadzone || -Xbox.GetY(XboxController::JoystickHand(0)) < -deadzone){
 				XboxY = -Xbox.GetY(XboxController::JoystickHand(0));
-
 			}
 			else{
 				XboxY = 0;
@@ -249,16 +248,6 @@ public:
 	        }
 	        else {
 	        	Climber.Set(0);
-	        }
-	        //folder
-	        if (Xbox.GetStartButton() && FolderB.Get()){ //Limit switch stuff eventually
-	        	Folder.Set(-0.25); //Lean Back
-	        }
-	        else if (Xbox.GetBackButton() && FolderF.Get()){ //Limit switch stuff eventually
-	        	Folder.Set(0.25); //Lean Forward
-	        }
-	        else{
-	        	Folder.Set(0);
 	        }
 	        //intake
 
@@ -312,7 +301,7 @@ public:
 				frc::Wait(0.05);
 				error = 0;
 			}
-			else if((-EncoderL.GetDistance() > (distance + 1)) && (EncoderR.GetDistance() > (distance + 1))) {
+			else if((-EncoderL.GetDistance() > (distance + 0.1)) && (EncoderR.GetDistance() > (distance + 0.1))) {
 				NavXBackwards(target);
 				frc::Wait(0.05);
 				error = 0;
@@ -340,19 +329,27 @@ public:
 
 		bool drive(true);
 		double target = ahrs->GetAngle() + angle;
+		int error(0);
 		while(drive && IsEnabled()) {
 			if(((ahrs->GetAngle()) < (target - 1))) {
-				myRobot.TankDrive(0.6,-0.6);
+				myRobot.TankDrive(0.575,-0.575);
 				frc::Wait(0.05);
+				error = 0;
 			}
 			else if(((ahrs->GetAngle()) > (target + 1))) {
-				myRobot.TankDrive(-0.6,0.6);
+				myRobot.TankDrive(-0.575,0.575);
 				frc::Wait(0.05);
+				error = 0;
 			}
 			else {
+				if(error < 100){
 					myRobot.TankDrive(0, 0);
+					++error;
+			}
+				else{
+				myRobot.TankDrive(0, 0);
 					drive = false;
-
+				}
 			}
 			myRobot.TankDrive(0,0);
 		}
@@ -375,12 +372,6 @@ public:
 			frc::SmartDashboard::PutNumber("Fix", fix);
 			myRobot.TankDrive(-ROBOT_SPEED, fix);
 		}
-	void FoldUp(){
-			return;
-		 while (FolderF.Get())
-			 Folder.Set(0.25); //Lean Forward
-		 Folder.Set(0.0);
-	}
 	void StopIntake(){
 		Intake.Set(0);
 	}
@@ -416,23 +407,13 @@ public:
 	}
 	void StartMiddle(){
 		frc::Wait(1.0);
-		turnTo(90);
+		goForward(10);
 	}
 //FIELD CROSSING AUTOS NEED TO BE CHECKED THEY'RE ALL MOSTLY GUESSED
 	void StartLeftSwitchLeftScaleLeft(){//CHECK RANDOM GUESS
 		//left side auto (LL)
-		goForward(14.0);//10.0
+		goForward(12.0);//10.0
 		turnTo(90.0);
-		goForward(1.0);
-		ToSwitch();
-		goForward(-1);
-		turnTo(-90);
-		goForward(2.0);
-		turnTo(90.0);
-		StartIntake();
-		Wait(8);
-		goForward(4.0);
-		turnTo(30.0);
 		ToSwitch();
 #ifndef Plan_B
 		goForward(-1.0);
@@ -450,9 +431,8 @@ public:
 #endif
 }
 	void StartLeftSwitchLeftScaleRight(){
-		goForward(14.0);
+		goForward(12.0);
 		turnTo(90.0);
-		goForward(1.0);
 		ToSwitch();
 #ifndef Plan_B
 		goForward(-1.0);
@@ -519,9 +499,8 @@ public:
 #endif
 	}
 	void StartRightSwitchRightScaleLeft(){
-		goForward(14.0);
+		goForward(12.0);//10.0
 		turnTo(-90.0);
-		goForward(1.0);
 		ToSwitch();
 #ifndef Plan_B
 		goForward(-1.0);
@@ -540,7 +519,6 @@ public:
 	void StartRightSwitchRightScaleRight(){
 		goForward(14.0);
 		turnTo(-90.0);
-		goForward(1.0);
 		ToSwitch();
 #ifndef Plan_B
 		goForward(-1.0);
