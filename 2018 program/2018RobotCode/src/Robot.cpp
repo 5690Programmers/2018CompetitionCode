@@ -1,12 +1,10 @@
 // Pick a Robot, or your motors will be sad!!!
 //#define FRIDAY_
-#define FRIDAY_
+#define NIGEL_
 #define ROBOT_SPEED 0.65
-#define CALIBRATE_STRAIGHT 0.64183
+#define CALIBRATE_STRAIGHT 0.6983
 #define ENCODER_STEP 0.0099
 #define NavX true
-
-#define Plan_B true
 
 #include <iostream>
 #include <memory>
@@ -54,8 +52,8 @@ class Robot: public frc::SampleRobot {
 	frc::VictorSP Elevator{6}; //right and left triggers
 	frc::VictorSP Climber{9}; //right bumper
 
-	frc::DigitalInput ElevatorU {7};
-	frc::DigitalInput ElevatorD {6};
+	frc::DigitalInput ElevatorU {5};
+	frc::DigitalInput ElevatorOU {4};
 
 	frc::SpeedControllerGroup Intake{IntakeL, IntakeR}; //A, B, C, D buttons
 	//driving speed controllers
@@ -65,19 +63,22 @@ class Robot: public frc::SampleRobot {
 	frc::DifferentialDrive myRobot {GroupL, GroupR};
 
 	frc::XboxController Xbox { 0 };
-//do the values for the encoders have to match those of the motors they are attached to?
 	frc::Encoder EncoderR {0, 1, false, frc::Encoder::EncodingType::k4X};
 	frc::Encoder EncoderL {2, 3, false, frc::Encoder::EncodingType::k4X};
 
 	frc::AnalogInput DisStuff {3};
 
 	frc::SendableChooser<std::string> chooser;
+	frc::DigitalInput Limit {7};
 
 	const std::string autoNameMiddle = "StartMiddle";
 	const std::string autoNameLeft = "StartLeft";
 	const std::string autoNameRight = "StartRight";
 
 	AHRS *ahrs;
+	enum Height {DOWN,
+		SWITCH,
+		SCALE};
 
 
 public:
@@ -86,7 +87,7 @@ public:
 
 	//Gets the ultrasonic sensor's value
 	int Ultrasensor();
-
+	Height elevatorHeight = DOWN;
 
 	Robot()
 	{
@@ -188,10 +189,15 @@ public:
 		double deadzone = 0.2;
 		double XboxY;
 		double XboxX;
-
+		int limitTiming(0);
+		bool limit(false);
+		bool tempLim1(false);
+		bool tempLim2(false);
+		int rumbleCount(0);
 		//double Correction = (-EncoderL.GetDistance()*0.0104) - (EncoderR.GetDistance()*0.0104);
 
 		while (IsOperatorControl() && IsEnabled()) {
+
 
 			SmartDashboard::PutNumber( "Left DisNotRaw: ", (EncoderL.GetDistance()));//Left Motor Distance in inches  //*0.0104
 			SmartDashboard::PutNumber( "Right DisNotRaw: ", (EncoderR.GetDistance()));//Right Motor Distance in inches  //*0.0104
@@ -201,11 +207,8 @@ public:
 			SmartDashboard::PutBoolean( "IMU_IsMoving",         ahrs->IsMoving());//Is the robot moving?
 			SmartDashboard::PutNumber(  "Velocity_X",           ahrs->GetVelocityX() );//How fast robot is in X direction
 			SmartDashboard::PutNumber(  "Velocity_Y",           ahrs->GetVelocityY() );//How fast robot is in Y direction
-	        SmartDashboard::PutNumber(  "Displacement_X",       ahrs->GetDisplacementX() );//How far robot is in X direction
-			SmartDashboard::PutNumber(  "Displacement_Y",       ahrs->GetDisplacementY() );//How far robot is in Y direction
-
-
-
+	        SmartDashboard::PutNumber(  "Accel_X",       ahrs->GetRawAccelX() );//How far robot is in X direction
+			SmartDashboard::PutNumber(  "Accel_Y",       ahrs->GetRawAccelY());//How far robot is in Y direction
 
 //Tank with adjustments
 			if(Xbox.GetX(XboxController::JoystickHand(0)) > deadzone || Xbox.GetX(XboxController::JoystickHand(0)) < -deadzone){
@@ -222,22 +225,46 @@ public:
 				XboxY = 0;
 			}
 			//Button Commands}
-	   /*     if(Xbox.GetBumper(XboxController::JoystickHand(1)))
-				myRobot.TankDrive(.5, .5);
+/*	        if(Xbox.GetBackButton())
+				myRobot.TankDrive(-1, -1);
 
-			else if(Xbox.GetBumper(XboxController::JoystickHand(0)))
-				myRobot.TankDrive(-.5,-.5);
+			else if(Xbox.GetStartButton())
+				myRobot.TankDrive(1, 1);
 
 			else*/
 //unnote when needed^
+			if(elevatorHeight == SWITCH || elevatorHeight == SCALE){
+				myRobot.ArcadeDrive( XboxY/2, XboxX/2, true);
+				if(abs(ahrs->GetRawAccelX()) > 0.5 || abs(ahrs->GetRawAccelY()) > 0.5)
+					rumbleCount = 100;
+				if(rumbleCount > 0){
+					Xbox.SetRumble(XboxController::kRightRumble, 0.5);
+					Xbox.SetRumble(XboxController::kLeftRumble, 0.5);
+				}
+				else{
+					Xbox.SetRumble(XboxController::kRightRumble, 0);
+					Xbox.SetRumble(XboxController::kLeftRumble, 0);
+				}
 
-			myRobot.ArcadeDrive( XboxY, XboxX/1.25, true);
+			}
+			else{
+				myRobot.ArcadeDrive( XboxY, XboxX/1.25, true);
+				Xbox.SetRumble(XboxController::kRightRumble, 0);
+				Xbox.SetRumble(XboxController::kLeftRumble, 0);
+			}
+
+
 	        //elevator
-	        if (Xbox.GetY(XboxController::JoystickHand(1)) > 0){ //Limit switch change values when wired
-	        	if (ElevatorU.Get()) Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
+	        if (Xbox.GetY(XboxController::JoystickHand(1)) > 0.1){ //Limit switch change values when wired
+	        	if (ElevatorU.Get() && ElevatorOU.Get()){
+	        		Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
+	        	}
+	        	else {
+	        		Elevator.Set(0);
+	        	}
 	        }
-	        else if (Xbox.GetY(XboxController::JoystickHand(1)) < 0){ //Limit switch change values when wired
-	        	if (ElevatorD.Get())Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
+	        else if (Xbox.GetY(XboxController::JoystickHand(1)) < -0.1){ //Limit switch change values when wired
+	        	Elevator.Set(-Xbox.GetY(XboxController::JoystickHand(1)));
 	        }
 	        else{
 	        	Elevator.Set(0);
@@ -263,8 +290,51 @@ public:
 	        }
 
 			 //Variable Updates
-			//Correction = (-EncoderL.GetDistance()*0.0104) - (EncoderR.GetDistance()*0.0104);
-			frc::Wait(0.005);
+	        if(Xbox.GetXButton())
+	        	elevatorHeight = DOWN;
+	        if(Xbox.GetBButton())
+	        	elevatorHeight = SCALE;
+
+	        //Correction = (-EncoderL.GetDistance()*0.0104) - (EncoderR.GetDistance()*0.0104);
+	        if(!Limit.Get() && (limitTiming + 1)%2)
+	        	tempLim1 = true;
+	        else if(Limit.Get())
+	        	tempLim1 = false;
+	        if(!Limit.Get() && (limitTiming)%2)
+	        	tempLim2 = true;
+	        else if(Limit.Get())
+	        	tempLim2 = false;
+	        if((tempLim1 && !tempLim2) || (!tempLim1 && tempLim2))
+	        	limit = true;
+	        else
+	        	limit = false;
+
+
+//for this bit of logic, when we have the real robot we need to swap the Xbox.Get_Button to the elevator power,
+//as the current state is for logic testing.
+	        if(limit && limitTiming < 1 && elevatorHeight == DOWN){
+	        	elevatorHeight = SWITCH;
+	        	limitTiming = 200;
+	        }
+	        else if(limit && (limitTiming < 1) && (elevatorHeight == SWITCH) && (Xbox.GetYButton())){
+	        	elevatorHeight = SCALE;
+	        	limitTiming = 200;
+	        }
+	        else if(limit && (limitTiming < 1) && (elevatorHeight == SWITCH) && (Xbox.GetAButton())){
+	        	elevatorHeight = DOWN;
+	        	limitTiming = 200;
+	        }
+	        else if(limit && (limitTiming < 1) && (elevatorHeight == SCALE) && (Xbox.GetAButton())){
+	        	elevatorHeight = SWITCH;
+	        	limitTiming = 200;
+	        }
+	        --limitTiming;
+	        --rumbleCount;
+	        frc::SmartDashboard::PutBoolean("Limit", limit);
+	        frc::SmartDashboard::PutBoolean("Limit 1", tempLim1);
+	        frc::SmartDashboard::PutBoolean("Limit 2", tempLim2);
+	        frc::SmartDashboard::PutNumber("Height", elevatorHeight);
+	        frc::Wait(0.005);
 		}
 	}
 }
@@ -332,7 +402,7 @@ public:
 		int error(0);
 		while(drive && IsEnabled()) {
 			if(((ahrs->GetAngle()) < (target - 1))) {
-				myRobot.TankDrive(0.575,-0.575);
+				myRobot.TankDrive(0.6,-0.6);
 				frc::Wait(0.05);
 				error = 0;
 			}
@@ -388,7 +458,7 @@ public:
 	void ToScale(){
 		double time=0;
 		if (ElevatorU.Get()) Elevator.Set(.5);
-		while (ElevatorU.Get() && time<=1.0){
+		while (ElevatorU.Get() && time<=4.0){
 			frc::Wait(.1);
 			time+=0.1;
 		}
@@ -407,186 +477,112 @@ public:
 	}
 	void StartMiddle(){
 		frc::Wait(1.0);
+		turnTo(15);//change when correct angle is known
 		goForward(10);
 	}
 //FIELD CROSSING AUTOS NEED TO BE CHECKED THEY'RE ALL MOSTLY GUESSED
-	void StartLeftSwitchLeftScaleLeft(){//CHECK RANDOM GUESS
-		//left side auto (LL)
+//add two feet to the end of each auto run until we fix the encoder
+	void StartLeftSwitchLeftScaleLeft(){
+		//left side auto (LL) two cube switch, scale
 		goForward(12.0);//10.0
 		turnTo(90.0);
+		goForward(1.0);
 		ToSwitch();
-#ifndef Plan_B
-		goForward(-1.0);
-		turnTo(-90.0);
-		goForward(5.0);
-		turnTo(135.0);
+		turnTo(-90);
+		goForward(7.0);//5.0
+		turnTo(135);
 		StartIntake();
-		goForward(2.0);
+		goForward(5.0);//3.0
 		StopIntake();
-		goForward(-2.0);
-
-		turnTo(-135.0);
-		goForward(6.0);
+		goForward(-5.0);//3.0
+		turnTo(-135);
+		goForward(7.5);//5.5
 		ToScale();
-#endif
 }
 	void StartLeftSwitchLeftScaleRight(){
-		goForward(12.0);
+		//left side auto (LR) double switch
+		goForward(12.0);//10.0
 		turnTo(90.0);
+		goForward(1.0);
 		ToSwitch();
-#ifndef Plan_B
-		goForward(-1.0);
-		turnTo(-90.0);
-		goForward(5.0);
-		turnTo(135.0);
+		turnTo(-90);
+		goForward(7.0);//5.0
+		turnTo(135);
 		StartIntake();
-		goForward(2.0);
+	    goForward(5.0);//3.0
 		StopIntake();
-		goForward(-2.0);
-		turnTo(-45.0);
-		goForward(14.0);
-		turnTo(-90.0);
-		goForward(6.0);
-		ToScale();
-#endif
+		ToSwitch();
 	}
 	void StartLeftSwitchRightScaleLeft(){//CHECK THE ROUTES
-		goForward(18.5);//15.5
+		//left start auto (RL) switch
+		goForward(17.5);//15.5
 		turnTo(90);
-		goForward(19.0);//20.0
+		goForward(15.0);//17.0
+		//throw over other cubes
 		turnTo(90);
-		goForward(1.5);//5.5
 		ToSwitch();
-		StartIntake();
-#ifndef Plan_B
-		goForward(-1.0);
-		turnTo(90.0);
-		goForward(5.5);
-		turnTo(-90);
-		goForward(15.0);
-		turnTo(140);
-		StartIntake();
-		goForward(3.0);
-		StopIntake();
-		goForward(-3.0);
-		turnTo(-165);
-		goForward(5.0);
-		ToScale();
-#endif
 	}
 	void StartLeftSwitchRightScaleRight(){//CHECK TO ROUTES
-		goForward(18.5);//15.5
+		//left start auto (RR) switch
+		goForward(17.5);//15.5
 		turnTo(90);
-		goForward(19.0);//20.0
+		goForward(15.0);//17.0
+		//throw over other cubes
 		turnTo(90);
-		goForward(1.5);//5.5
 		ToSwitch();
-		StartIntake();
-#ifndef Plan_B
-		turnTo(90.0);
-		goForward(5.0);//4.0
-		goForward(-1.0);
-		turnTo(90.0);
-		goForward(5.0);
-		turnTo(-135.0);
-		StartIntake();
-		goForward(2.0);
-		StopIntake();
-		goForward(-2.0);
-		turnTo(135.0);
-		goForward(6.0);
-		ToScale();
-#endif
 	}
 	void StartRightSwitchRightScaleLeft(){
+	//right side auto (RL) double switch
 		goForward(12.0);//10.0
 		turnTo(-90.0);
+		goForward(1.0);
 		ToSwitch();
-#ifndef Plan_B
-		goForward(-1.0);
-		turnTo(90.0);
-		goForward(5.0);
-		turnTo(-135.0);
+		turnTo(90);
+		goForward(7.0);//5.0
+		turnTo(-135);
 		StartIntake();
-		goForward(2.0);
+	    goForward(5.0);//3.0
 		StopIntake();
-		goForward(-2.0);
-		turnTo(135.0);
-		goForward(6.0);
-		ToScale();
-#endif
+		ToSwitch();
 	}
 	void StartRightSwitchRightScaleRight(){
-		goForward(14.0);
+	//right side auto (RR) two cube switch, scale
+		goForward(12.0);//10.0
 		turnTo(-90.0);
+		goForward(1.0);
 		ToSwitch();
-#ifndef Plan_B
-		goForward(-1.0);
-		turnTo(90.0);
-		goForward(5.0);
-		turnTo(-135.0);
+		turnTo(90);
+		goForward(7.0);//5.0
+		turnTo(-135);
 		StartIntake();
-		goForward(2.0);
+		goForward(5.0);//3.0
 		StopIntake();
-		goForward(-2.0);
-		turnTo(45.0);
-		goForward(14.0);
-		turnTo(90.0);
-		goForward(6.0);
+		goForward(-5.0);//3.0
+		turnTo(135);
+		goForward(7.5);//5.5
 		ToScale();
-#endif
 	}
 	void StartRightSwitchLeftScaleLeft(){//CHECK THE ROUTES
-		goForward(18.5);//15.5
+		//right start auto (LL) switch
+		goForward(17.5);//15.5
 		turnTo(-90);
-		goForward(19.0);//20.0
+		goForward(15.0);//17.0
+		//throw over other cubes
 		turnTo(-90);
-		goForward(1.5);//5.5
 		ToSwitch();
-		StartIntake();
-#ifndef Plan_B
-		turnTo(-90.0);
-		goForward(5.0);//4.0
-		goForward(-1.0);
-		turnTo(-90.0);
-		goForward(5.5);
-		turnTo(90);
-		goForward(15.0);
-		turnTo(-140);
-		StartIntake();
-		goForward(3.0);
-		StopIntake();
-		goForward(-3.0);
-		turnTo(165);
-		goForward(5.0);
-		ToScale();
-#endif
 	}
 	void StartRightSwitchLeftScaleRight(){//CHECK THE ROUTES
-		goForward(18.5);//10
-	    turnTo(-90.0);
-		goForward(21.0);//20
+		//right start auto (LR) switch
+		goForward(17.5);//15.5
 		turnTo(-90);
-		goForward(6.5);//5.5
-		turnTo(-90.0);
-		goForward(5.0);//4.0
+		goForward(15.0);//17.0
+		//throw over other cubes
+		turnTo(-90);
 		ToSwitch();
-		goForward(-1.0);
-#ifndef Plan_B
-		ToSwitch();
-        goForward(-1.0);
-		turnTo(90.0);
-		goForward(5.0);
-		turnTo(-135.0);
-		StartIntake();
-		goForward(2.0);
-		StopIntake();
-		goForward(-2.0);
-		turnTo(135.0);
-		goForward(6.0);
-		ToScale();
-#endif
 		}
+
+
+
 
 };
 
