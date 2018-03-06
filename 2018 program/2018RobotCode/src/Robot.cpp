@@ -1,6 +1,6 @@
 // Pick a Robot, or your motors will be sad!!!
 //#define FRIDAY_
-#define NIGEL_
+#define NIGEL_ //FRIDAY_
 #define ROBOT_SPEED 0.65
 #define CALIBRATE_STRAIGHT 0.6983
 #define ENCODER_STEP 0.0099
@@ -74,6 +74,7 @@ class Robot: public frc::SampleRobot {
 	const std::string autoNameMiddle = "StartMiddle";
 	const std::string autoNameLeft = "StartLeft";
 	const std::string autoNameRight = "StartRight";
+	const std::string autoNamePineapple = "StartPineapple";
 
 	AHRS *ahrs;
 	enum Height {DOWN,
@@ -122,7 +123,7 @@ public:
 		            err_string += ex.what();
 		            DriverStation::ReportError(err_string.c_str());
 		        }
-
+		chooser.AddDefault(autoNamePineapple,autoNamePineapple);
 		chooser.AddDefault(autoNameMiddle, autoNameMiddle);
 		chooser.AddObject(autoNameLeft, autoNameLeft);
 		chooser.AddObject(autoNameRight,autoNameRight);
@@ -138,8 +139,16 @@ public:
 		std::cout << "Auto selected: " << autoSelected << std::endl;
 		std::string gameData;
 				gameData=frc::DriverStation::GetInstance().GetGameSpecificMessage();
+		if(autoSelected==autoNamePineapple){
+			PineappleTest();
+		}
 		if(autoSelected==autoNameMiddle){
-			StartMiddle();
+			if(gameData[0] == 'L'){
+				StartMiddleSwitchLeft();
+			}
+			else{
+				StartMiddleSwitchRight();
+			}
 		}
 		else if(autoSelected == autoNameLeft){
 			//[]is start of start of scale and '' is start of switch
@@ -328,8 +337,10 @@ public:
 	        	elevatorHeight = SWITCH;
 	        	limitTiming = 200;
 	        }
-	        --limitTiming;
-	        --rumbleCount;
+	        if(limitTiming > 0)
+	        	--limitTiming;
+	        if(rumbleCount > 0)
+	        	--rumbleCount;
 	        frc::SmartDashboard::PutBoolean("Limit", limit);
 	        frc::SmartDashboard::PutBoolean("Limit 1", tempLim1);
 	        frc::SmartDashboard::PutBoolean("Limit 2", tempLim2);
@@ -475,11 +486,6 @@ public:
 		frc::Wait(1.0);
 		Intake.Set(0.0);
 	}
-	void StartMiddle(){
-		frc::Wait(1.0);
-		turnTo(15);//change when correct angle is known
-		goForward(10);
-	}
 //FIELD CROSSING AUTOS NEED TO BE CHECKED THEY'RE ALL MOSTLY GUESSED
 //add two feet to the end of each auto run until we fix the encoder
 	void StartLeftSwitchLeftScaleLeft(){
@@ -518,8 +524,8 @@ public:
 		goForward(17.5);//15.5
 		turnTo(90);
 		goForward(15.0);//17.0
-		//throw over other cubes
 		turnTo(90);
+		//throw over other cubes
 		ToSwitch();
 	}
 	void StartLeftSwitchRightScaleRight(){//CHECK TO ROUTES
@@ -527,8 +533,8 @@ public:
 		goForward(17.5);//15.5
 		turnTo(90);
 		goForward(15.0);//17.0
-		//throw over other cubes
 		turnTo(90);
+		//throw over other cubes
 		ToSwitch();
 	}
 	void StartRightSwitchRightScaleLeft(){
@@ -567,8 +573,8 @@ public:
 		goForward(17.5);//15.5
 		turnTo(-90);
 		goForward(15.0);//17.0
-		//throw over other cubes
 		turnTo(-90);
+		//throw over other cubes
 		ToSwitch();
 	}
 	void StartRightSwitchLeftScaleRight(){//CHECK THE ROUTES
@@ -576,14 +582,51 @@ public:
 		goForward(17.5);//15.5
 		turnTo(-90);
 		goForward(15.0);//17.0
-		//throw over other cubes
 		turnTo(-90);
+		//throw over other cubes
 		ToSwitch();
 		}
 
+	void StartMiddleSwitchLeft(){
+		goForward(4.0);// 3.0
+		turnTo(-90);
+		goForward(4.0);//3.0
+		turnTo(90);
+		goForward(4.0);
+		ToSwitch();
+		goForward(-3.0);
+		turnTo(45);
+		StartIntake();;
+		goForward(2.0);
+		StopIntake();
+		goForward(-2.0);
+		turnTo(-45);
+		goForward(3.0);
+		ToSwitch();
+	}
 
+	void StartMiddleSwitchRight(){
+		goForward(4.0);// 3.0
+		turnTo(90);
+		goForward(4.0);//3.0
+		turnTo(-90);
+		goForward(4.0);
+		ToSwitch();
+		goForward(-3.0);
+		turnTo(-45);
+		StartIntake();;
+		goForward(2.0);
+		StopIntake();
+		goForward(-2.0);
+		turnTo(45);
+		goForward(3.0);
+		ToSwitch();
+	}
 
-
+	void PineappleTest(){
+	//testing auto slot
+	goForward(-5);//we need to test its ability to drive backwards in auto in order to get  multi cube autos
+	}
 };
 
 START_ROBOT_CLASS(Robot)
